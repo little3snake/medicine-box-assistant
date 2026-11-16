@@ -157,6 +157,12 @@ Codex: _(add if used)_.
 
 ### Blue UI integration update
 
+- User's screenshot review identified that default Material components did not match
+  the approved preview: tinted narrow product summary, outlined composer label and
+  differing control styling. Corrected with explicit white surfaces, neutral borders,
+  full-width product summary, external input labels and custom blue navigation tiles.
+  Keep API/demo selection unchanged during this visual correction.
+
 - User approved the preview and authorized real screen/API implementation. Preserve
   the teammate's Java core and merge her backend instead of duplicating endpoints.
 - Use one blue palette, labelled actions, 56 dp main touch targets and system font

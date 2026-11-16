@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -30,6 +31,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,6 +59,11 @@ class MainActivity : ComponentActivity() {
                     surface = Color.White, onSurface = Color(0xFF18263D),
                     surfaceVariant = Color(0xFFEDF1F8), onSurfaceVariant = Color(0xFF526079),
                     outline = Color(0xFF748197), outlineVariant = Color(0xFFD8DFEB)
+                ), typography = Typography(
+                    bodyLarge = TextStyle(fontSize = 17.sp, lineHeight = 26.sp),
+                    bodyMedium = TextStyle(fontSize = 17.sp, lineHeight = 26.sp),
+                    bodySmall = TextStyle(fontSize = 14.sp, lineHeight = 21.sp),
+                    labelLarge = TextStyle(fontSize = 16.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium)
                 )) { MedicineApp(model) }
             }
         }
@@ -88,7 +95,11 @@ private fun MedicineApp(model: MedicineViewModel) {
                 Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.LocalPharmacy, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
                     Text("Medicine Box", Modifier.weight(1f).padding(start = 10.dp), fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
-                    TextButton(onClick = model::toggleText, enabled = !model.busy, contentPadding = PaddingValues(8.dp)) {
+                    FilledTonalButton(onClick = model::toggleText, enabled = !model.busy,
+                        shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(8.dp),
+                        modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.primary)) {
                         Text("Аа", modifier = Modifier.semantics { contentDescription = if (model.large) "Обычный размер текста" else "Увеличить текст" }, fontSize = 18.sp)
                     }
                     IconButton(onClick = { model.navigate(Page.SETTINGS) }, enabled = !model.busy) {
@@ -100,14 +111,7 @@ private fun MedicineApp(model: MedicineViewModel) {
         bottomBar = {
             Column(Modifier.navigationBarsPadding().imePadding()) {
                 if (model.page == Page.CHAT && model.confirmed) QuestionComposer(model)
-                if (model.page != Page.CHAT) {
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        NavigationBarItem(selected = model.page != Page.CABINET, onClick = { model.navigate(Page.HOME) },
-                            enabled = !model.busy, icon = { Icon(Icons.Outlined.ChatBubbleOutline, null) }, label = { Text("Помощник") })
-                        NavigationBarItem(selected = model.page == Page.CABINET, onClick = { model.navigate(Page.CABINET) },
-                            enabled = !model.busy, icon = { Icon(Icons.Outlined.Inventory2, null) }, label = { Text("Моя аптечка") })
-                    }
-                }
+                AppNavigation(model)
             }
         }
     ) { padding ->
@@ -245,7 +249,7 @@ private fun MedicineApp(model: MedicineViewModel) {
                     }
                     Page.SETTINGS -> item { ConnectionSettings(model) }
                 }
-                item { Text("Помогает читать инструкцию. Не заменяет консультацию врача.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                if (model.page != Page.CHAT) item { Disclaimer() }
             }
         }
     }
@@ -269,18 +273,30 @@ private fun MedicineApp(model: MedicineViewModel) {
 }
 @Composable private fun PrimaryAction(text: String, onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null, enabled: Boolean = true) {
-    Button(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = enabled, shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(16.dp)) {
+    Button(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = enabled, shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(16.dp),
+        colors = ButtonDefaults.buttonColors(disabledContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
         icon?.let { Icon(it, null); Spacer(Modifier.width(10.dp)) }; Text(text, fontSize = 17.sp)
     }
 }
 @Composable private fun SecondaryAction(text: String, onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null, enabled: Boolean = true) {
-    OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = enabled, shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(16.dp)) {
+    OutlinedButton(onClick, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = enabled,
+        shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            disabledContainerColor = MaterialTheme.colorScheme.surface,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant)) {
         Text(text, Modifier.weight(1f), fontSize = 17.sp); icon?.let { Spacer(Modifier.width(10.dp)); Icon(it, null) }
     }
 }
 @Composable private fun Field(label: String, text: String, onChange: (String) -> Unit) {
-    OutlinedTextField(text, onChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), maxLines = 3)
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Text(label, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+        OutlinedTextField(text, onChange, modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+            colors = inputColors(), shape = RoundedCornerShape(12.dp), maxLines = 3)
+    }
 }
 @Composable private fun Step(number: Int, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -313,7 +329,8 @@ private fun MedicineApp(model: MedicineViewModel) {
     bitmap?.let { Surface(shape = RoundedCornerShape(16.dp)) { Image(it, "Ваше фото упаковки", Modifier.fillMaxWidth().heightIn(max = 180.dp), contentScale = ContentScale.Fit) } }
 }
 @Composable private fun ProductDetails(product: MedicineProduct) {
-    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(product.name, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
             listOf("Дозировка" to product.strength, "Форма выпуска" to product.form, "Производитель" to product.manufacturer).forEach { (title, text) ->
@@ -323,26 +340,31 @@ private fun MedicineApp(model: MedicineViewModel) {
     }
 }
 @Composable private fun SelectedProduct(product: MedicineProduct) {
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.CheckCircleOutline, null, tint = MaterialTheme.colorScheme.primary)
-            Column(Modifier.padding(start = 12.dp)) { Text(product.name, fontWeight = FontWeight.SemiBold); Label("${product.strength} · ${product.form}") }
+            Column(Modifier.weight(1f).padding(start = 12.dp)) { Text(product.name, fontWeight = FontWeight.SemiBold); Label("${product.strength} · ${product.form}") }
         }
     }
 }
 @Composable private fun QuestionComposer(model: MedicineViewModel) {
     Surface(color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Ваш вопрос об инструкции", fontSize = 15.sp, fontWeight = FontWeight.Medium)
             OutlinedTextField(model.question, { if (it.length <= 2000) model.question = it },
-                label = { Text("Ваш вопрос об инструкции") }, placeholder = { Text("Например, как хранить?") },
-                modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), maxLines = 3, enabled = !model.busy)
+                placeholder = { Text("Например, как хранить?") },
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Ваш вопрос об инструкции" },
+                colors = inputColors(), shape = RoundedCornerShape(12.dp), maxLines = 3, enabled = !model.busy)
             PrimaryAction("Отправить вопрос", { model.ask() }, Icons.Outlined.ArrowUpward, model.question.isNotBlank() && !model.busy)
+            Disclaimer()
         }
     }
 }
 @Composable private fun Exchange(entry: ChatEntry) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Surface(Modifier.align(Alignment.End).fillMaxWidth(.92f), color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(16.dp)) {
+        Surface(Modifier.align(Alignment.End).fillMaxWidth(.9f), color = MaterialTheme.colorScheme.primaryContainer,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp)) {
             Text(entry.question, Modifier.padding(16.dp), fontSize = 18.sp)
         }
         val title = when (entry.response.status) {
@@ -359,13 +381,52 @@ private fun MedicineApp(model: MedicineViewModel) {
 }
 @Composable private fun EvidencePanel(title: String, text: String, sourceUrl: String = "") {
     var expanded by remember(text) { mutableStateOf(false) }
-    Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(10.dp)) {
             TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
                 Text(title, Modifier.weight(1f), fontSize = 17.sp)
                 Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, if (expanded) "Свернуть" else "Развернуть")
             }
             if (expanded) { Text(text, Modifier.padding(8.dp), fontSize = 18.sp, lineHeight = 27.sp); SourceLink(sourceUrl) }
+        }
+    }
+}
+
+@Composable private fun inputColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surface,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+    disabledContainerColor = MaterialTheme.colorScheme.surface,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant
+)
+
+@Composable private fun Disclaimer() {
+    Text("Помогает читать инструкцию.\nНе заменяет консультацию врача.", fontSize = 13.sp,
+        lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable private fun AppNavigation(model: MedicineViewModel) {
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Column {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(Triple("Помощник", Page.HOME, Icons.Outlined.ChatBubbleOutline),
+                    Triple("Моя аптечка", Page.CABINET, Icons.Outlined.Inventory2)).forEach { (text, page, icon) ->
+                    val active = if (page == Page.HOME) model.page != Page.CABINET else model.page == Page.CABINET
+                    TextButton(onClick = { model.navigate(page) }, enabled = !model.busy,
+                        modifier = Modifier.weight(1f).heightIn(min = 64.dp), shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            contentColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(icon, null, Modifier.size(22.dp)); Text(text, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
         }
     }
 }

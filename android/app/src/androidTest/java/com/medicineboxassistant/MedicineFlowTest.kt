@@ -4,22 +4,22 @@ import android.content.Context
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 
 class MedicineFlowTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
-
-    @Before fun reset() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        context.getSharedPreferences("medicine-box", Context.MODE_PRIVATE).edit().clear().commit()
-        compose.activityRule.scenario.recreate()
+    @get:Rule(order = 0) val cleanPreferences = object : ExternalResource() {
+        override fun before() {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            context.getSharedPreferences("medicine-box", Context.MODE_PRIVATE).edit().clear().commit()
+        }
     }
+    @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
 
     private fun confirmDemo() {
         compose.onNodeWithText("Найти по названию").performScrollTo().performClick()
-        compose.onNodeWithText("Название лекарства").performTextInput("Учебная упаковка")
+        compose.onNodeWithContentDescription("Название лекарства").performTextInput("Учебная упаковка")
         compose.onNodeWithText("Найти лекарство").performScrollTo().performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("Всё совпадает, продолжить").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Отправить вопрос").assertDoesNotExist()
@@ -35,7 +35,8 @@ class MedicineFlowTest {
 
     @Test fun cabinetSurvivesActivityRecreationAndRequiresConfirmationAgain() {
         confirmDemo()
-        compose.onNodeWithText("Сохранить в аптечку").performScrollTo().performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Сохранить в аптечку"))
+        compose.onNodeWithText("Сохранить в аптечку").performClick()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Другое лекарство").performScrollTo().performClick()
         compose.onNodeWithText("Моя аптечка").performClick()

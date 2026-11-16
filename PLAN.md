@@ -165,6 +165,10 @@ All rates reported with a **95% Wilson interval**, separately for RU and KK; ret
 
 ### Approved UI redesign and integration
 
+Visual fidelity follow-up approved by user: use the accepted medicine-clear-blue preview as the
+reference, with explicit white surfaces, blue accents, neutral borders, full-width selected-product
+card, labelled non-floating composer and consistent navigation. Preserve API and state behavior.
+
 User approved the blue accessible screens and requested their implementation and real API wiring.
 Implement home/photo, manual fields, candidates, confirmation, chat, leaflet, saved cabinet and
 recoverable error screens. Use one blue design system, labelled controls and large text support.

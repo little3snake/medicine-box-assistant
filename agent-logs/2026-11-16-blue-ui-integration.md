@@ -39,3 +39,12 @@ Final visual check exposed an emulator compositor issue: semantic nodes were pre
 but the app surface appeared black and hidden. Rebooting the emulator without wiping
 data restored rendering. Inspected the actual blue home screen after a cold launch;
 aligned the navigation selection and outline colours with the same blue palette.
+
+## Visual fidelity follow-up
+
+User reported a mismatch against the accepted blue preview. Corrected selected-product
+surface to full-width white with neutral border, explicit white secondary buttons and
+inputs, external field labels, blue Aa control, blue navigation tiles, consistent body
+typography and asymmetrical question bubble. The chat composer and disclaimer now follow
+the preview's grouping; navigation stays available. Updated the field selector in the
+flow test for the external accessible label. No API or medicine policy changes.

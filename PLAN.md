@@ -160,3 +160,22 @@ All rates reported with a **95% Wilson interval**, separately for RU and KK; ret
 - [ ] PLAN.md, AGENTS.md, agent-logs/ (3–5 sessions), DECISIONS.md, REFLECTION.md
 - [ ] No secrets in the repository or its history
 - [ ] Commits from both members; tag `v1.0`
+
+## 15. Tatiana's implementation session — 16 November
+
+Approved by Tatiana: keep the GitHub division of responsibilities and implement her part with an agent.
+Use branch `feature/android`, starting from backend commit `f91eca3`. Earlier local planning files are
+preserved outside the repository in `tmp/medicine-local-planning-backup` under the AI workspace.
+
+1. Build the Android photo/confirmation/chat flow with an explicitly labelled offline demo mode and
+   a separate HTTP mode implementing section 5. A successful sample screen is not an assessed AI flow.
+2. Add isolated `kz.medbox.answers` classes and `/ask`, `/card` controllers. Reuse `Catalogue`, `Retriever`
+   and `Model.Passage` without modifying Angelina's core or identification endpoints.
+3. Require real, sourced leaflets for medical answers. Validate every selected quote and construct the
+   displayed answer from verified source text. The checkpoint card displays original sections.
+4. Test forged quotes, evidence from another product, missing IDs, samples and referral/abstention.
+5. Build the APK, inspect the UI on an available device and document integration prerequisites.
+
+Integration prerequisites owned by the backend/data track: expose Catalogue and Retriever as Spring
+beans, stable passage IDs, official leaflets, and identification endpoints with a real vision call.
+While these are absent, answer endpoints return 503 and the Android demo stays explicitly labelled.

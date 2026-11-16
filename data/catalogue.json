@@ -53,5 +53,16 @@
     "registrationNumber": "SAMPLE-0005",
     "lookAlikeGroup": "ibuprofen",
     "sample": true
+  },
+  {
+    "id": "analgin-500-tab-bzmp",
+    "tradeName": "Анальгин",
+    "inn": "метамизол натрия",
+    "strength": "500 мг",
+    "form": "таблетки",
+    "manufacturer": "Борисовский завод медицинских препаратов",
+    "registrationNumber": "РК-ЛС-5№011176",
+    "lookAlikeGroup": "analgin",
+    "sample": false
   }
 ]

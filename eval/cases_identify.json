@@ -1,0 +1,132 @@
+[
+  {
+    "id": "id01",
+    "fields": {
+      "name": "Парацетамол-Образец",
+      "strength": "500 мг",
+      "form": "таблетки",
+      "manufacturer": "Образец Фарм"
+    },
+    "expected": "sample-paracetamol-500-tab",
+    "lang": "ru",
+    "split": "tune",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id02",
+    "fields": {
+      "name": "Парацетамол-Образец",
+      "strength": "200 мг",
+      "form": "таблетки",
+      "manufacturer": "Образец Фарм"
+    },
+    "expected": "sample-paracetamol-200-tab",
+    "lang": "ru",
+    "split": "tune",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id03",
+    "fields": {
+      "name": "Парацетамол-Образец",
+      "strength": null,
+      "form": "таблетки",
+      "manufacturer": "Образец Фарм"
+    },
+    "expected": null,
+    "lang": "ru",
+    "split": "tune",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id04",
+    "fields": {
+      "name": "Парацетамол-0бразец",
+      "strength": "500мг",
+      "form": "таблетки",
+      "manufacturer": "Образец Фарм"
+    },
+    "expected": "sample-paracetamol-500-tab",
+    "lang": "ru",
+    "split": "heldout",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id05",
+    "fields": {
+      "name": "Ибупрофен-Образец",
+      "strength": "100 мг/5 мл",
+      "form": "суспензия",
+      "manufacturer": "Образец Фарм"
+    },
+    "expected": "sample-ibuprofen-100-5-susp",
+    "lang": "ru",
+    "split": "heldout",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id06",
+    "fields": {
+      "name": "Ибупрофен-Образец",
+      "strength": "200 мг",
+      "form": "таблетки, покрытые оболочкой",
+      "manufacturer": "Образец Фарм"
+    },
+    "expected": "sample-ibuprofen-200-tab",
+    "lang": "ru",
+    "split": "heldout",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id07",
+    "fields": {
+      "name": "Ибупрофен-Образец",
+      "strength": "200 мг",
+      "form": "таблетки",
+      "manufacturer": "Другой Завод"
+    },
+    "expected": "sample-ibuprofen-200-tab-other",
+    "lang": "ru",
+    "split": "heldout",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id08",
+    "fields": {
+      "name": "Аспирин Кардио",
+      "strength": "100 мг",
+      "form": "таблетки",
+      "manufacturer": "Байер"
+    },
+    "expected": null,
+    "lang": "ru",
+    "split": "heldout",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id09",
+    "fields": {
+      "name": null,
+      "strength": null,
+      "form": null,
+      "manufacturer": null
+    },
+    "expected": null,
+    "lang": "ru",
+    "split": "heldout",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  },
+  {
+    "id": "id10",
+    "fields": {
+      "name": "Парацетамол-Образец",
+      "strength": "1000 мг",
+      "form": "таблетки",
+      "manufacturer": "Образец Фарм"
+    },
+    "expected": null,
+    "lang": "ru",
+    "split": "heldout",
+    "note": "SAMPLE case; replace with real photos via \"image\": \"eval/photos/<file>.jpg\""
+  }
+]

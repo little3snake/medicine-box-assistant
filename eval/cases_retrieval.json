@@ -1,0 +1,82 @@
+[
+  {
+    "id": "rt01",
+    "variantId": "sample-paracetamol-500-tab",
+    "question": "Можно ли давать детям?",
+    "expectedSection": "children",
+    "lang": "ru",
+    "split": "tune"
+  },
+  {
+    "id": "rt02",
+    "variantId": "sample-paracetamol-500-tab",
+    "question": "Как хранить?",
+    "expectedSection": "storage",
+    "lang": "ru",
+    "split": "tune"
+  },
+  {
+    "id": "rt03",
+    "variantId": "sample-paracetamol-200-tab",
+    "question": "Какие побочные эффекты?",
+    "expectedSection": "side_effects",
+    "lang": "ru",
+    "split": "tune"
+  },
+  {
+    "id": "rt04",
+    "variantId": "sample-paracetamol-200-tab",
+    "question": "Можно при беременности?",
+    "expectedSection": "pregnancy",
+    "lang": "ru",
+    "split": "heldout"
+  },
+  {
+    "id": "rt05",
+    "variantId": "sample-ibuprofen-200-tab",
+    "question": "Сколько принимать в день?",
+    "expectedSection": "dosing",
+    "lang": "ru",
+    "split": "heldout"
+  },
+  {
+    "id": "rt06",
+    "variantId": "sample-ibuprofen-200-tab",
+    "question": "От чего помогает?",
+    "expectedSection": "indications",
+    "lang": "ru",
+    "split": "heldout"
+  },
+  {
+    "id": "rt07",
+    "variantId": "sample-ibuprofen-100-5-susp",
+    "question": "Кому нельзя принимать?",
+    "expectedSection": "contraindications",
+    "lang": "ru",
+    "split": "heldout"
+  },
+  {
+    "id": "rt08",
+    "variantId": "sample-ibuprofen-100-5-susp",
+    "question": "Какой срок годности?",
+    "expectedSection": "shelf_life",
+    "lang": "ru",
+    "split": "heldout"
+  },
+  {
+    "id": "rt09",
+    "variantId": "sample-ibuprofen-200-tab-other",
+    "question": "Можно вместе с алкоголем?",
+    "expectedSection": "interactions",
+    "lang": "ru",
+    "split": "heldout"
+  },
+  {
+    "id": "rt10",
+    "variantId": "sample-ibuprofen-200-tab-other",
+    "question": "Кто производитель?",
+    "expectedSection": "manufacturer",
+    "lang": "ru",
+    "split": "heldout"
+  }
+]

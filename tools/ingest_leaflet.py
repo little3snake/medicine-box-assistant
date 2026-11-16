@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
-"""Convert an official Kazakhstan leaflet (text copied from register.ndda.kz or the manufacturer's PDF)
-into section JSON for the backend.
+"""Convert an official leaflet (text from register.ndda.kz or the manufacturer's PDF) into section JSON.
 
 Usage:
-    python tools/ingest_leaflet.py --variant <variant-id> --lang ru \
+    python3 tools/ingest_leaflet.py --variant <variant-id> --lang ru \
         --source-url "https://register.ndda.kz/..." --input leaflet.txt
 
 Writes data/leaflets/<variant-id>/<lang>.json and prints a suggested catalogue.json entry
 built from the leaflet header (trade name, INN, form and strength) — check it by hand.
 
-How it works: Kazakhstan leaflets ("Инструкция по медицинскому применению (Листок-вкладыш)") use fixed
-headings. A short line that STARTS WITH a known heading starts a new section; everything until the next
-heading belongs to it. Text is kept VERBATIM (only whitespace at line ends is stripped), because answers
-must quote it exactly. If two headings match, the longest wins ("Описание нежелательных реакций" is
-side effects, not "Описание"). Unrecognised lines stay in the previous section: read the printed summary.
+A short line that STARTS WITH a known heading starts a new section; everything until the next heading
+belongs to it. Text is kept VERBATIM (only whitespace at line ends is stripped), because answers must
+quote it exactly. If two headings match, the longest wins. Unrecognised lines stay in the previous section.
 
-Headings cover both the current format (with "Перечень сведений, необходимых до начала применения",
-"Рекомендации по применению", "Сведения о производителе") and the older one ("Способ применения и дозы",
-"Побочные действия"). Kazakh headings: TODO with a native speaker.
+Headings cover the EAEU patient leaflet ("Листок-вкладыш – информация для пациента", numbered sections),
+the current KZ format ("Перечень сведений, необходимых до начала применения", "Рекомендации по применению")
+and the older one ("Способ применения и дозы", "Побочные действия"). Kazakh headings: TODO.
 """
 import argparse
 import datetime
@@ -28,7 +25,8 @@ import sys
 
 # type -> heading prefixes (lowercase, ё→е). Keep types in sync with backend SectionTypes.java.
 HEADINGS_RU = [
-    ("trade_name", ["торговое наименование"]),
+    ("trade_name", ["торговое наименование", "торговое название"]),
+    ("pharmacology", ["фармакологические свойства", "фармакокинетика", "фармакодинамика"]),
     ("inn", ["международное непатентованное название"]),
     ("form", ["лекарственная форма", "описание"]),
     ("pharmacotherapeutic_group", ["фармакотерапевтическая группа"]),
@@ -54,12 +52,26 @@ HEADINGS_RU = [
     ("manufacturer", ["сведения о производителе", "производитель"]),
     ("holder", ["держатель регистрационного удостоверения"]),
     ("contact", ["наименование, адрес и контактные данные"]),
+    # EAEU patient leaflet, numbered sections; numbers are stripped before matching.
+    ("indications", ["что из себя представляет препарат", "что из себя представляет", "для чего применяется"]),
+    ("precautions", ["о чем следует знать перед приемом", "о чем следует знать перед применением"]),
+    ("special_warnings", ["особые указания и меры предосторожности"]),
+    ("children", ["дети и подростки", "дети"]),
+    ("interactions", ["другие препараты и", "другие лекарственные препараты и"]),
+    ("pregnancy", ["беременность, грудное вскармливание", "беременность и грудное вскармливание"]),
+    ("driving", ["управление транспортными средствами"]),
+    ("dosing", ["прием препарата", "применение препарата", "рекомендуемая доза"]),
+    ("overdose", ["если вы приняли", "если вы применили"]),
+    ("side_effects", ["возможные нежелательные реакции"]),
+    ("storage", ["хранение препарата"]),
+    ("composition", ["содержимое упаковки и прочие сведения", "препарат содержит", "действующим веществом является"]),
 ]
+NUMBERING = re.compile(r"^\s*\d+(\.\d+)*\.?\s+")
 MAX_HEADING_LEN = 120
 
 
-def detect(line: str):
-    low = line.strip().lower().replace("ё", "е")
+def detect(line):
+    low = NUMBERING.sub("", line.strip().lower().replace("ё", "е"))
     if not low or len(low) > MAX_HEADING_LEN:
         return None
     best, best_len = None, 0
@@ -70,7 +82,7 @@ def detect(line: str):
     return best
 
 
-def split_sections(text: str):
+def split_sections(text):
     sections, cur = [], None
     for raw in text.splitlines():
         line = raw.rstrip()
@@ -95,19 +107,33 @@ def first_line(sections, typ):
     return None
 
 
-def suggest_catalogue_entry(variant, sections):
-    """Header fields → a draft catalogue entry. Strength/form are split on the last comma as a guess:
-    'Таблетки, покрытые оболочкой, 150 мг' → form 'Таблетки, покрытые оболочкой', strength '150 мг'."""
+EAEU_TITLE = re.compile(r"^\s*(?P<name>[^,]+),\s*(?P<strength>\d[\d.,]*\s*[^\s,]+(?:\s*/\s*[\d.,]*\s*[^\s,]+)?),\s*(?P<form>.+?)\s*$")
+
+
+def eaeu_title(text):
+    """EAEU leaflets start with a line like 'Анальгин, 500 мг, таблетки'."""
+    for line in text.splitlines()[:15]:
+        m = EAEU_TITLE.match(line)
+        if m and not detect(line):
+            return m.group("name").strip(), m.group("strength").strip(), m.group("form").strip()
+    return None
+
+
+def suggest_catalogue_entry(variant, sections, text=""):
     form_line = first_line(sections, "form") or ""
     m = re.match(r"^(.*?),\s*([\d.,]+\s*\S+(?:\s*/\s*[\d.,]*\s*\S+)?)\s*$", form_line)
     form, strength = (m.group(1), m.group(2)) if m else (form_line, None)
+    name = (first_line(sections, "trade_name") or "").replace("®", "").strip()
+    title = eaeu_title(text)
+    if title and not name:
+        name, strength, form = title
     return {
         "id": variant,
-        "tradeName": (first_line(sections, "trade_name") or "").replace("®", "").strip(),
+        "tradeName": name,
         "inn": (first_line(sections, "inn") or "").lower(),
         "strength": strength,
         "form": form,
-        "manufacturer": first_line(sections, "manufacturer"),
+        "manufacturer": first_line(sections, "manufacturer") or first_line(sections, "holder"),
         "registrationNumber": None,
         "lookAlikeGroup": None,
         "sample": False,
@@ -130,24 +156,19 @@ def main():
     if not sections:
         sys.exit("No known headings found. Check the input text.")
 
-    out = {
-        "variantId": a.variant,
-        "lang": a.lang,
-        "sourceUrl": a.source_url,
-        "retrievedAt": datetime.date.today().isoformat(),
-        "sections": sections,
-    }
-    path = pathlib.Path(a.data_dir) / "leaflets" / a.variant / f"{a.lang}.json"
+    out = {"variantId": a.variant, "lang": a.lang, "sourceUrl": a.source_url,
+           "retrievedAt": datetime.date.today().isoformat(), "sections": sections}
+    path = pathlib.Path(a.data_dir) / "leaflets" / a.variant / (a.lang + ".json")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"Wrote {path} with {len(sections)} sections:")
+    print("Wrote {} with {} sections:".format(path, len(sections)))
     for s in sections:
-        print(f"  {s['type']:<26} {s['title'][:55]!r}  ({len(s['text'])} chars)")
+        print("  {:<26} {!r}  ({} chars)".format(s["type"], s["title"][:55], len(s["text"])))
     missing = {"indications", "contraindications", "dosing", "side_effects", "storage"} - {s["type"] for s in sections}
     if missing:
-        print(f"WARNING: no section found for: {', '.join(sorted(missing))} — check the headings in the text.")
+        print("WARNING: no section found for: " + ", ".join(sorted(missing)) + " — check the headings in the text.")
     print("\nSuggested catalogue.json entry (CHECK BY HAND against the package):")
-    print(json.dumps(suggest_catalogue_entry(a.variant, sections), ensure_ascii=False, indent=2))
+    print(json.dumps(suggest_catalogue_entry(a.variant, sections, text), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

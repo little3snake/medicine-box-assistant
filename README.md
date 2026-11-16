@@ -1,80 +1,82 @@
 # Medicine Box Assistant
 
-Android application for identifying a medicine package, confirming its exact variant,
-and reading leaflet answers with verified quotations. This is a student prototype.
+AI search for official medicine leaflets in Kazakhstan. CSS4007 Artificial Intelligence, final project.
+Team: Subbotina Tatiana, Angelina Ivleva.
 
-## Current status
+You photograph a medicine package. The app identifies the **exact** product (name, strength, dosage form, manufacturer), shows a readable card built from the official leaflet, and answers questions using only verbatim, cited passages from that product's leaflet. Not medical advice; intended for adults.
 
-The Android client builds and has separate **Demo** and **API** modes. Demo uses
-clearly labelled synthetic responses and does not call a model. API mode implements
-the contract in `PLAN.md`. A complete real-data flow is not yet verified.
+> **Checkpoint status (16 Nov):** backend works end to end on **SAMPLE data** (fictional products marked `"sample": true`, placeholder leaflet text). Real leaflets from register.ndda.kz are added with `tools/ingest_leaflet.py`. See DECISIONS.md.
 
-The answer module provides `/api/products/{id}/ask` and `/card`. It needs Spring
-`Catalogue` and `Retriever` beans from the backend integration. Without them it
-returns HTTP 503. Sample catalogue entries are rejected for leaflet answers.
+## Repository layout
+| Path | What |
+|---|---|
+| `backend/` | Spring Boot API: catalogue, vision identification, product matching, BM25 retrieval |
+| `android/` | Android app (Kotlin, Compose), see its own section below |
+| `data/` | `catalogue.json` + `leaflets/<variant-id>/<lang>.json` |
+| `tools/ingest_leaflet.py` | Converts a leaflet copied as plain text into section JSON (verbatim) |
+| `eval/` | Evaluation cases and runners |
+| `agent-logs/` | Key sessions with our coding agents |
+| `PLAN.md`, `AGENTS.md` (+ `CLAUDE.md`), `DECISIONS.md` | Plan, agent instructions, decisions |
+| `docs/RESEARCH.md` | Existing solutions and the official leaflet format |
+| `tools/check_secrets.py` | Secret scan, also the git pre-commit hook |
 
-## Android
+## Backend: run from a clean machine
+Requirements: **Java 21**, **Maven 3.9+**, Python 3.10+ (only for tools and eval).
 
-Install Android Studio and its Android SDK. Open `android/` and let Gradle sync.
-The project uses SDK 37, minimum Android 8 (API 26), and a Java 25 Gradle daemon.
-On a clean machine Gradle needs internet access to download its dependencies and JDK.
-
-```powershell
-cd android
-.\gradlew.bat :app:assembleDebug :app:testDebugUnitTest
-```
-
-Run the `app` configuration on an emulator or Android device. In the app settings,
-choose API mode and use `http://10.0.2.2:8080` for a backend on the emulator host.
-A physical phone needs the computer's reachable LAN address. HTTP is enabled only
-in debug builds; production endpoints must use HTTPS. No API key belongs in Android.
-
-Select/take a photo or enter printed fields, search for variants, select the exact
-package, then explicitly confirm it before asking a question.
-
-## Backend
-
-Install JDK 21 or later and Maven. The build targets Java 21.
-
-```powershell
+```bash
+git clone <repo-url> && cd <repo>
+python tools/check_secrets.py --install-hook   # once per clone
 cd backend
-mvn test
-mvn spring-boot:run
+export GEMINI_API_KEY=...        # Windows PowerShell: $env:GEMINI_API_KEY="..."
+# optional: export GEMINI_MODEL=<model id from Google AI Studio>
+mvn test                         # unit tests
+mvn spring-boot:run              # http://localhost:8080
+```
+Without `GEMINI_API_KEY` everything works except photo identification (`/api/identify` returns 503 with a hint).
+Every vision call is logged to `backend/logs/vision.jsonl` (model, latency, tokens, parsed fields; never the key).
+
+### API
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/health` | Status, number of variants, whether vision is configured |
+| GET | `/api/products?q=` | List / search products (manual choice) |
+| GET | `/api/products/{id}` | One product + available leaflet languages |
+| GET | `/api/products/{id}/leaflet?lang=ru` | All leaflet sections, verbatim |
+| POST | `/api/identify` | multipart `image` → vision model → match result |
+| POST | `/api/identify/fields` | JSON `{name, strength, form, manufacturer}` → match result (user corrections, evaluation) |
+| POST | `/api/products/{id}/retrieve` | `{question, lang, k}` → top-k passages from this product's leaflet only |
+
+Match result: `{extracted, normalized, candidates:[{variantId, label, score, breakdown}], needsClarification, reasons}`.
+`needsClarification=true` means the app must ask the user to confirm (reasons: `LOW_SCORE`, `AMBIGUOUS`, `STRENGTH_NOT_READ`, `STRENGTH_MISMATCH`, `FORM_NOT_READ`, `FORM_MISMATCH`, `NO_CANDIDATES`).
+
+### Try it end to end without the app
+```bash
+curl localhost:8080/api/health
+curl -X POST localhost:8080/api/identify -F image=@photo.jpg
+curl -X POST localhost:8080/api/identify/fields -H "Content-Type: application/json" \
+  -d '{"name":"Парацетамол-Образец","strength":"500 мг","form":"таблетки","manufacturer":"Образец Фарм"}'
+curl -X POST localhost:8080/api/products/sample-paracetamol-500-tab/retrieve -H "Content-Type: application/json" \
+  -d '{"question":"Можно ли давать детям?","lang":"ru","k":3}'
 ```
 
-Set `GEMINI_API_KEY` in the backend environment. As requested for local development,
-the answer client also reads a git-ignored `.env` in the repository root or backend
-working directory. Its syntax is Java properties: `GEMINI_API_KEY=your_value`, with
-no `export` or surrounding quotes. Environment variables take precedence.
-`GEMINI_MODEL` is configurable; the default is `gemini-3.6-flash`. Availability,
-quota and an actual provider call still need verification for your account.
+### Add a real product
+1. Add an entry to `data/catalogue.json` (`"sample": false`).
+2. Copy the leaflet text from register.ndda.kz into a `.txt` file and run
+   `python tools/ingest_leaflet.py --variant <id> --lang ru --source-url <url> --input leaflet.txt`
+3. Check the printed section list, restart the backend.
 
-Runtime model metadata goes to ignored `logs/answer-calls.jsonl`. Do not commit
-keys, personal photos or runtime logs.
+### Backend evaluation
+With the backend running, **from the repository root**: `python eval/run_backend_eval.py` (use `--split heldout` for held-out cases only).
+Reports identification accuracy, confident wrong matches (main safety metric), top-1, field-level exact match for photo cases, and retrieval hit@1 / hit@3 next to the chance level — all with 95% Wilson intervals, per language; per-case CSV in `eval/results_backend.csv`.
+Photo cases: put photos in `eval/photos/` and add cases with `"image"` and `"expectedFields"` (see `eval/cases_identify.json`).
 
-## Integration handoff
+## Android app
+_(Tatiana: setup and run instructions.)_
 
-Angelina's backend supplies the identify/fields, identify/photo, product, leaflet and
-retrieval endpoints from `PLAN.md`, and registers `Catalogue` and `Retriever` beans.
-Every leaflet section needs a unique, nonempty `passageId`; source URLs must use
-HTTPS, and production records must contain real sourced text with `sample: false`.
-Tatiana's isolated implementation is in `kz.medbox.answers` and `android/`.
+## Third-party components
+Spring Boot (Apache 2.0), Jackson (Apache 2.0), Google Gemini API (vision). Leaflet texts: State register of medicines of Kazakhstan, https://register.ndda.kz/ (source URL and retrieval date stored per leaflet).
 
-The answer model selects evidence; application code validates exact quotations and
-constructs the answer from those quotations. This intentionally limits generated
-prose for the checkpoint. Personal-treatment detection is a heuristic and still
-requires evaluation. Exact quote validation alone does not prove relevance.
 
-Before submitting the checkpoint: test a real photo through the actual backend and
-model, confirm a variant, ask a question, inspect its source, and record the tested
-commit. A demo-only run is not evidence that this integration works.
+## Android client
 
-## Checks
-
-```powershell
-python tools/check_secrets.py --all
-```
-
-Backend tests currently cover matching, retrieval, quote validation, mixed variants,
-sample rejection and personal-treatment referral. Provider connectivity and the
-complete Android-to-backend flow are separate pending integration checks.
+See [Android setup and current integration](docs/android-setup.md).

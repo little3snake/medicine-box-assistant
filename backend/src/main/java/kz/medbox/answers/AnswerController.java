@@ -58,4 +58,10 @@ public final class AnswerController {
     public java.util.Map<String, String> unavailable(IllegalStateException exception) {
         return java.util.Map.of("error", "Источник данных или модель пока не готовы.");
     }
+
+    @ExceptionHandler(java.io.IOException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public java.util.Map<String, String> providerUnavailable(java.io.IOException exception) {
+        return java.util.Map.of("error", "Модель не ответила. Попробуйте ещё раз позже.");
+    }
 }

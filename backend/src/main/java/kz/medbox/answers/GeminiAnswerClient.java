@@ -24,13 +24,16 @@ public final class GeminiAnswerClient implements AnswerGateway {
     private final String apiKey;
     private final String model;
     private final ObjectMapper mapper;
+    private final Duration timeout;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
     public GeminiAnswerClient(@Value("${GEMINI_API_KEY:}") String apiKey,
-                              @Value("${GEMINI_MODEL:gemini-3.6-flash}") String model, ObjectMapper mapper) {
+                              @Value("${GEMINI_MODEL:gemini-3.6-flash}") String model,
+                              @Value("${GEMINI_TIMEOUT_SECONDS:150}") int timeoutSeconds, ObjectMapper mapper) {
         this.apiKey = apiKey;
         this.model = model;
         this.mapper = mapper;
+        this.timeout = Duration.ofSeconds(Math.max(10, Math.min(timeoutSeconds, 160)));
     }
 
     @Override
@@ -55,7 +58,7 @@ public final class GeminiAnswerClient implements AnswerGateway {
                 """));
         HttpRequest request = HttpRequest.newBuilder(URI.create(
                         "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"))
-                .timeout(Duration.ofSeconds(50))
+                .timeout(timeout)
                 .header("x-goog-api-key", apiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body))).build();

@@ -41,6 +41,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     var large by mutableStateOf(preferences.getBoolean("large", false)); private set
     var saved by mutableStateOf(readSaved()); private set
     var connectionStatus by mutableStateOf(""); private set
+    var canRetry by mutableStateOf(false); private set
 
     fun toggleText() { large = !large; preferences.edit().putBoolean("large", large).apply() }
     fun navigate(next: Page) { if (!busy) page = next }
@@ -57,12 +58,13 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     fun editFields(value: PackageFields) { fields = value; invalidateConfirmation() }
     private fun invalidateConfirmation() { confirmed = false; product = null; entries = emptyList(); leaflet = null; question = "" }
     fun beginNew() { invalidateConfirmation(); identification = null; fields = PackageFields(); photo = null; page = Page.HOME }
-    fun reportPhotoFailure() { fail("Не удалось открыть фото", "Выберите другое фото или введите название вручную.", Page.HOME) }
+    fun reportPhotoFailure() { retry = null; canRetry = false; fail("Не удалось открыть фото", "Выберите другое фото или введите название вручную.", Page.HOME) }
 
     private fun perform(label: String, retryAction: () -> Unit, action: suspend () -> Unit) {
         if (busy) return
         returnPage = page
         retry = retryAction
+        canRetry = true
         busy = true; progress = label; error = ""
         job = scope.launch {
             try { action() }
@@ -110,6 +112,10 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     }
     private suspend fun acceptIdentification(result: Identification) {
         identification = result; fields = result.fields
+        if (photo != null && fields.name.isBlank() && result.candidates.isEmpty()) {
+            fail("Название не удалось прочитать", "Сфотографируйте название и дозировку крупнее, при хорошем освещении. Или введите данные вручную.", Page.HOME)
+            return
+        }
         if (result.candidates.size == 1) loadProduct(result.candidates.first()) else page = Page.CANDIDATES
     }
     fun choose(candidate: ProductCandidate) {
@@ -155,6 +161,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
         if (busy) return
         // Never silently switch servers or promote demo records to real data.
         if (item.server != server || item.demo != demo) {
+            retry = null; canRetry = false
             fail("Другая среда подключения", "Эта запись сохранена ${if (item.demo) "в деморежиме" else "на другом сервере"}. Выберите соответствующее подключение в настройках.", Page.CABINET); return
         }
         perform("Проверяем данные сохранённого препарата…", { openSaved(item) }) {

@@ -235,7 +235,7 @@ private fun MedicineApp(model: MedicineViewModel) {
                         item { Title(model.errorTitle, model.error) }
                         model.product?.let { item { SelectedProduct(it) } }
                         item { ActionGroup {
-                            PrimaryAction("Повторить", model::retryRequest, Icons.Outlined.Refresh)
+                            if (model.canRetry) PrimaryAction("Повторить", model::retryRequest, Icons.Outlined.Refresh)
                             SecondaryAction("Ввести данные вручную", { model.navigate(Page.MANUAL) })
                             SecondaryAction("Выбрать другое фото", { gallery.launch("image/*") })
                             TextButton(onClick = { model.navigate(Page.SETTINGS) }) { Text("Настройки подключения") }
@@ -373,7 +373,7 @@ private fun MedicineApp(model: MedicineViewModel) {
     var failed by remember { mutableStateOf(false) }
     if (source?.scheme == "https" && !source.host.isNullOrBlank() && source.userInfo == null) {
         TextButton(onClick = { failed = runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.isFailure }) {
-            Text("Открыть официальный источник"); Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.OpenInNew, null)
+            Text("Открыть источник инструкции"); Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.OpenInNew, null)
         }
     }
     if (failed) Text("Не удалось открыть браузер.", color = MaterialTheme.colorScheme.error)

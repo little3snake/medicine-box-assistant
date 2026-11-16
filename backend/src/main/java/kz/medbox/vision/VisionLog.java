@@ -21,8 +21,9 @@ import java.util.HexFormat;
 
 /**
  * Appends one JSON line per vision call to logs/vision.jsonl:
- * time, model, latency, HTTP status, whether the schema was used, extracted fields, token usage,
- * and the SHA-256 of the image (so a logged reply can be matched to an eval photo without storing the photo).
+ * time, model, latency, HTTP status (0 = no response), whether the schema was used, number of attempts,
+ * extracted fields, token usage, and the SHA-256 of the image (so a logged reply can be matched to an eval photo
+ * without storing the photo). Failed calls add errorKind and Gemini's error message.
  * Never logs the API key. logs/ is in .gitignore.
  */
 @Component
@@ -38,8 +39,25 @@ public class VisionLog {
         this.mapper = mapper;
     }
 
-    public synchronized void write(byte[] image, String model, long ms, int status, boolean schemaUsed,
-                                   ExtractedFields fields, JsonNode usage) {
+    /** A successful call: extracted fields and token usage. */
+    public void write(byte[] image, String model, long ms, int status, boolean schemaUsed, int attempts,
+                      ExtractedFields fields, JsonNode usage) {
+        append(image, model, ms, status, schemaUsed, attempts, fields, usage, null, null);
+    }
+
+    /**
+     * A failed call. status is the HTTP status, or 0 when no response arrived.
+     * errorKind: http | timeout | network | interrupted.
+     * error must already be redacted by the caller (GeminiVisionClient.redact); it is Gemini's message, never the key.
+     */
+    public void writeError(byte[] image, String model, long ms, int status, boolean schemaUsed, int attempts,
+                           String errorKind, String error) {
+        append(image, model, ms, status, schemaUsed, attempts, null, null, errorKind, error);
+    }
+
+    private synchronized void append(byte[] image, String model, long ms, int status, boolean schemaUsed,
+                                     int attempts, ExtractedFields fields, JsonNode usage,
+                                     String errorKind, String error) {
         try {
             ObjectNode n = mapper.createObjectNode();
             n.put("time", Instant.now().toString());
@@ -47,9 +65,12 @@ public class VisionLog {
             n.put("ms", ms);
             n.put("status", status);
             n.put("schemaUsed", schemaUsed);
+            n.put("attempts", attempts);
             n.put("imageSha256", sha256(image));
             if (fields != null) n.set("fields", mapper.valueToTree(fields));
             if (usage != null && !usage.isMissingNode()) n.set("usage", usage);
+            if (errorKind != null) n.put("errorKind", errorKind);
+            if (error != null) n.put("error", error);
             Files.createDirectories(file.getParent());
             Files.writeString(file, mapper.writeValueAsString(n) + "\n", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);

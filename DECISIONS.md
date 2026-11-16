@@ -151,3 +151,16 @@ Codex: _(add if used)_.
 - **Not a finding yet:** in the direct test (an English one-line prompt, not our production prompt) the answer
   was in English ("Tablets"). Our production prompt asks to copy text as printed; field-level accuracy on the
   photo set will show whether it does.
+
+## Claude Code session 01 (16 Nov, ~22:25): Gemini client reliability
+- The agent found the real cause of HTTP 500 on slow photos: HttpTimeoutException/IOException bypassed
+  ErrorHandler. Now they are logged (errorKind timeout/network) and returned as 503.
+- Retry on HTTP 503/429 only: 3 attempts, waits 2 s and 5 s. The schema fallback now runs only when the
+  400 error is about the schema; API_KEY_INVALID is not retried. Gemini's error message is logged, redacted.
+- The agent asked about the ambiguous "retry up to 3 times" (3 attempts vs 3 retries); we chose 3 attempts.
+  We decided: no overall deadline across attempts.
+- The agent's own good call: it did not map every IOException to 503 in ErrorHandler, because broken uploads
+  would then look like "vision unavailable".
+- Our correction: its plan redacted only AIza… keys; our key format is AQ. — added, with tests.
+- Agent mistake, self-corrected: it ran the secret check with `python` (Python 2 here), saw the failure and
+  reran it with `python3`.

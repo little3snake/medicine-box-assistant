@@ -1,0 +1,623 @@
+ ▐▛███▛█   Claude Code v2.1.325
+▝▜██████▀  Opus 5.5 · Claude Pro
+ ▝▝   ▝▝   ~/Desktop/medicine-box-assistant
+
+  Fable 5.2 is here for your longest and toughest coding tasks, and is included in your plan until November 16. It draws down usage faster than Opus 5.5. Switch with /model.
+
+❯ Read AGENTS.md and PLAN.md first. Task: make the Gemini vision client         
+  reliable. In backend/src/main/java/kz/medbox/vision/GeminiVisionClient.java   
+  and VisionLog.java: (1) retry up to 3 times with backoff 2 s and 5 s, only    
+  for HTTP 503 and 429; (2) retry without responseSchema only when the HTTP 400 
+  error message is about the schema, not for API_KEY_INVALID or other 400       
+  errors; (3) write Gemini's error message (never the API key) to               
+  logs/vision.jsonl; (4) log timeouts and network errors too, and return them   
+  to the client as HTTP 503 through ErrorHandler instead of 500. Add unit tests 
+  for the retry and fallback decisions. Plan first and wait for my approval,    
+  then implement and run cd backend && mvn test.                                
+
+● I'll read PLAN.md and the relevant code first, then propose a plan.
+
+  Searched for 1 pattern, read 5 files, listed 1 directory (ctrl+o to expand)
+
+● Here is my plan. I've read AGENTS.md, PLAN.md, GeminiVisionClient, VisionLog,
+  ErrorHandler, ApiController.identify and the existing GeminiParseTest.
+
+  Why timeouts give 500 today: extract() throws HttpTimeoutException /
+  IOException straight up through ApiController.identify. ErrorHandler only maps
+  VisionUnavailableException to 503, so everything else becomes a 500. Also,
+  any HTTP 400 currently triggers the no-schema fallback, including
+  API_KEY_INVALID.
+
+  Plan
+
+  1. GeminiVisionClient.java
+  - Pure decision functions (package-private and static, so they can be tested):
+    - isRetryable(int status) is true only for 503 and 429.
+    - isSchemaRejection(int status, String body) is true only when the status is
+      400, the error message mentions the response schema (response_schema /
+      responseSchema / generation_config), and no details[].reason equals
+      API_KEY_INVALID.
+    - errorMessage(String body, String apiKey) pulls out error.message, or a
+      truncated raw body if it isn't JSON. It replaces the key, and anything
+      shaped like a Google key (AIza…), with [redacted], and caps the length at
+      about 500 characters.
+  - Retry loop: at most 3 attempts in total, with sleeps of 2 s and then 5 s,
+    only when isRetryable is true. I'm reading "up to 3 times with backoff 2 s
+    and 5 s" as 3 attempts and 2 waits. If you meant 3 retries after the first
+    try, tell me.
+  - Schema fallback: only when isSchemaRejection is true. The fallback request
+    goes through the same retry loop. Every other 400 (bad key, bad image and so
+    on) fails right away with 503 and no fallback.
+  - Timeouts and network errors:
+    - I catch HttpTimeoutException, then other IOExceptions, and also
+      InterruptedException (restoring the interrupt flag).
+    - Each one is logged and rethrown as VisionUnavailableException, which
+      ErrorHandler already turns into 503.
+    - Timeouts are not retried, since you asked for retries only on 503/429.
+      With the current 150 s timeout, retrying them could take about 7.5
+      minutes.
+  - Testability: I add a package-private constructor that takes a small Sender
+    interface (request → status and body) and a Sleeper. Tests can then run the
+    loop with canned responses, with no network and no real sleeping. The Spring
+    constructor stays the same.
+  - Messages to the app stay generic, e.g. "Gemini returned HTTP 429 after 3
+    attempts" or "Gemini timed out after 150 s". Gemini's own error text goes
+    only to the log.
+
+  2. VisionLog.java
+  - Add attempts, errorKind (http | timeout | network | interrupted) and error
+    (the redacted Gemini message) to each line. Success lines keep their current
+    fields and gain attempts. Error lines use status: 0 when there was no HTTP
+    response.
+
+  3. ErrorHandler.java
+  - Probably no change. Timeouts reach it as VisionUnavailableException, which
+    already returns 503. I'm deliberately not adding a catch-all IOException → 
+    503, because that would also turn unrelated errors (such as a broken
+    multipart upload) into "vision unavailable". The API contract in PLAN.md §5
+    doesn't change.
+
+  4. Tests: new GeminiRetryTest.java
+  - isRetryable: true for 503 and 429; false for 500, 400 and 404.
+  - isSchemaRejection: true for a real schema-error body; false for an
+    API_KEY_INVALID body, a non-schema INVALID_ARGUMENT (e.g. the image), and
+    non-400 statuses.
+  - Retry loop:
+    - 503, 503, 200 → success after 3 calls, sleeps of [2 s, 5 s]
+    - 503 ×3 → 503 to the client
+    - 429 then 200 → success
+    - 500 → only 1 call
+  - Fallback: a schema 400 makes a second call without responseSchema, logged
+    with schemaUsed: false. An API_KEY_INVALID 400 → 1 call and no fallback.
+  - Timeout and ConnectException → VisionUnavailableException, and a log line
+    with the right errorKind.
+  - Logs use @TempDir. One test asserts that the log contains Gemini's message
+    and never the fake API key, even when the error body echoes the key back.
+
+  Then I'll run cd backend && mvn test and show you the output. No new
+  dependencies; I'll use JUnit and the JDK only.
+
+  One question: should there also be an overall deadline, e.g. no more than
+  about 160 s across all attempts? Without one, three slow 503s could each run
+  up to the 150 s timeout. If you don't need it, I'll leave it out.
+
+  Should I go ahead?
+
+✻ Brewed for 42s · done 22:24
+
+❯ One correction before you continue: the redaction must also cover Google keys 
+  in the "AQ." format (our key starts with AQ.), e.g. a regex like              
+  AQ\.[0-9A-Za-z_\-.]{20,}, in addition to AIza... and the literal key. Add a   
+  test case for an AQ.-style key too.                                           
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Redaction will cover AQ. keys too, matching the two patterns already in
+  tools/check_secrets.py, and the tests will build their fake keys at runtime so
+  the pre-commit check stays quiet. I'm starting the implementation now. 
+  · summary
+
+● Update(backend/src/main/java/kz/medbox/vision/GeminiVisionClient.java)
+  ⎿  Added 145 lines, removed 15 lines
+       64               "required":["name","strength","form","manufacture
+           r"]}
+       65              """;
+       66  
+       67 +    /** Waits between attempts; only HTTP 503 and 429 are retr
+          +ied. Attempts = BACKOFF.size() + 1 = 3. */                    
+       68 +    static final List<Duration> BACKOFF = List.of(Duration.ofS
+          +econds(2), Duration.ofSeconds(5));                            
+       69 +                                                              
+       70 +    /** Same key patterns as tools/check_secrets.py. */       
+       71 +    private static final Pattern AIZA_KEY = Pattern.compile("A
+          +Iza[0-9A-Za-z_\\-]{35}");                                     
+       72 +    private static final Pattern AQ_KEY = Pattern.compile("AQ\
+          +\.[0-9A-Za-z_\\-.]{20,}");                                    
+       73 +    private static final int MAX_ERROR_CHARS = 500;           
+       74 +    private static final String REDACTED = "[redacted]";      
+       75 +                                                              
+       76 +    /** One HTTP call to Gemini. Replaceable in tests so no ne
+          +twork is needed. */                                           
+       77 +    interface Sender {                                        
+       78 +        Reply send(byte[] image, String mime, boolean withSche
+          +ma) throws IOException, InterruptedException;                 
+       79 +    }                                                         
+       80 +                                                              
+       81 +    interface Sleeper {                                       
+       82 +        void sleep(Duration d) throws InterruptedException;   
+       83 +    }                                                         
+       84 +                                                              
+       85 +    record Reply(int status, String body) {}                  
+       86 +                                                              
+       87      private final String apiKey, model, baseUrl;
+       88      private final Duration timeout;
+       89      private final ObjectMapper mapper;
+       90      private final VisionLog visionLog;
+       91      private final HttpClient http = HttpClient.newHttpClient()
+           ;
+       92 +    private final Sender sender;                              
+       93 +    private final Sleeper sleeper;                            
+       94  
+       95 +    @Autowired                                                
+       96      public GeminiVisionClient(@Value("${gemini.api-key:}") Str
+           ing apiKey,
+       97                                @Value("${gemini.model}") String
+            model,
+       98                                @Value("${gemini.base-url}") Str
+           ing baseUrl,
+       99                                @Value("${gemini.timeout-seconds
+           :30}") int timeoutSeconds,
+      100                                ObjectMapper mapper, VisionLog v
+           isionLog) {
+      101 +        this(apiKey, model, baseUrl, timeoutSeconds, mapper, v
+          +isionLog, null, null);                                        
+      102 +    }                                                         
+      103 +                                                              
+      104 +    /** Package-private for unit tests: inject a fake sender a
+          +nd a sleeper that does not really sleep. */                   
+      105 +    GeminiVisionClient(String apiKey, String model, String bas
+          +eUrl, int timeoutSeconds,                                     
+      106 +                       ObjectMapper mapper, VisionLog visionLo
+          +g, Sender sender, Sleeper sleeper) {                          
+      107          this.apiKey = apiKey;
+      108          this.model = model;
+      109          this.baseUrl = baseUrl;
+      110          this.timeout = Duration.ofSeconds(timeoutSeconds);
+      111          this.mapper = mapper;
+      112          this.visionLog = visionLog;
+      113 +        this.sender = sender != null ? sender : this::httpSend
+          +;                                                             
+      114 +        this.sleeper = sleeper != null ? sleeper : d -> Thread
+          +.sleep(d.toMillis());                                         
+      115      }
+      116  
+      117      public boolean configured() { return apiKey != null && !ap
+           iKey.isBlank(); }
+      118  
+      119      public String model() { return model; }
+      120  
+       90 -    public ExtractedFields extract(byte[] image, String mimeTy
+          -pe) throws IOException, InterruptedException {                
+      121 +    /** Attempt bookkeeping for one extract() call, kept so fa
+          +ilures can still be logged with the count. */                 
+      122 +    private static final class CallState {                    
+      123 +        int attempts;                                         
+      124 +        boolean schemaUsed = true;                            
+      125 +    }                                                         
+      126 +                                                              
+      127 +    /**                                                       
+      128 +     * Calls Gemini and parses the four fields.               
+      129 +     * Every outcome (success, HTTP error, timeout, network er
+          +ror) is logged to logs/vision.jsonl.                          
+      130 +     * Every failure is thrown as VisionUnavailableException, 
+          +which ErrorHandler maps to HTTP 503.                          
+      131 +     */                                                       
+      132 +    public ExtractedFields extract(byte[] image, String mimeTy
+          +pe) throws IOException {                                      
+      133          if (!configured()) throw new VisionUnavailableExceptio
+           n("GEMINI_API_KEY is not set");
+      134          String mime = mimeType == null ? "image/jpeg" : mimeTy
+           pe;
+      135  
+      136          long t0 = System.nanoTime();
+       95 -        HttpResponse<String> resp = send(image, mime, true);  
+       96 -        boolean schemaUsed = true;                            
+       97 -        if (resp.statusCode() == 400) {                       
+       98 -            // Fallback: if this model/API version rejects the
+          - schema, retry with plain JSON mode once.                     
+       99 -            log.warn("Gemini rejected the response schema (HTT
+          -P 400); retrying without schema");                            
+      100 -            resp = send(image, mime, false);                  
+      101 -            schemaUsed = false;                               
+      137 +        CallState call = new CallState();                     
+      138 +        Reply reply;                                          
+      139 +        try {                                                 
+      140 +            reply = sendWithRetry(image, mime, true, call);   
+      141 +            if (isSchemaRejection(reply.status(), reply.body()
+          +, mapper)) {                                                  
+      142 +                // This model/API version rejects the schema: 
+          +retry once in plain JSON mode.                                
+      143 +                // Only for schema errors; a bad key or a bad 
+          +image is not retried.                                         
+      144 +                log.warn("Gemini rejected the response schema 
+          +(HTTP 400); retrying without schema");                        
+      145 +                call.schemaUsed = false;                      
+      146 +                reply = sendWithRetry(image, mime, false, call
+          +);                                                            
+      147 +            }                                                 
+      148 +        } catch (HttpTimeoutException e) {                    
+      149 +            visionLog.writeError(image, model, msSince(t0), 0,
+          + call.schemaUsed, call.attempts, "timeout",                   
+      150 +                    "no response within " + timeout.toSeconds(
+          +) + " s");                                                    
+      151 +            throw new VisionUnavailableException("Gemini timed
+          + out after " + timeout.toSeconds() + " s");                   
+      152 +        } catch (IOException e) {                             
+      153 +            visionLog.writeError(image, model, msSince(t0), 0,
+          + call.schemaUsed, call.attempts, "network",                   
+      154 +                    redact(e.toString(), apiKey));            
+      155 +            throw new VisionUnavailableException("network erro
+          +r calling Gemini (" + e.getClass().getSimpleName() + ")");    
+      156 +        } catch (InterruptedException e) {                    
+      157 +            Thread.currentThread().interrupt();               
+      158 +            visionLog.writeError(image, model, msSince(t0), 0,
+          + call.schemaUsed, call.attempts, "interrupted", null);        
+      159 +            throw new VisionUnavailableException("Gemini call 
+          +was interrupted");                                            
+      160          }
+      103 -        long ms = (System.nanoTime() - t0) / 1_000_000;       
+      161 +        long ms = msSince(t0);                                
+      162  
+      105 -        if (resp.statusCode() != 200) {                       
+      106 -            visionLog.write(image, model, ms, resp.statusCode(
+          -), schemaUsed, null, null);                                   
+      107 -            throw new VisionUnavailableException("Gemini retur
+          -ned HTTP " + resp.statusCode());                              
+      163 +        if (reply.status() != 200) {                          
+      164 +            visionLog.writeError(image, model, ms, reply.statu
+          +s(), call.schemaUsed, call.attempts, "http",                  
+      165 +                    errorMessage(reply.body(), apiKey, mapper)
+          +);                                                            
+      166 +            throw new VisionUnavailableException("Gemini retur
+          +ned HTTP " + reply.status()                                   
+      167 +                    + (call.attempts > 1 ? " after " + call.at
+          +tempts + " attempts" : ""));                                  
+      168          }
+      109 -        ExtractedFields fields = parse(resp.body(), mapper);  
+      110 -        visionLog.write(image, model, ms, 200, schemaUsed, fie
+          -lds, usage(resp.body()));                                     
+      169 +        ExtractedFields fields = parse(reply.body(), mapper); 
+      170 +        visionLog.write(image, model, ms, 200, call.schemaUsed
+          +, call.attempts, fields, usage(reply.body()));                
+      171          return fields;
+      172      }
+      173  
+      114 -    private HttpResponse<String> send(byte[] image, String mim
+          -e, boolean withSchema) throws IOException, InterruptedExceptio
+          -n {                                                           
+      174 +    /** Sends; on HTTP 503/429 waits 2 s, then 5 s, and tries 
+          +again (3 attempts at most). */                                
+      175 +    private Reply sendWithRetry(byte[] image, String mime, boo
+          +lean withSchema, CallState call)                              
+      176 +            throws IOException, InterruptedException {        
+      177 +        for (int i = 0; ; i++) {                              
+      178 +            call.attempts++;                                  
+      179 +            Reply r = sender.send(image, mime, withSchema);   
+      180 +            if (!isRetryable(r.status()) || i >= BACKOFF.size(
+          +)) return r;                                                  
+      181 +            log.warn("Gemini returned HTTP {} (attempt {} of {
+          +}); retrying in {} s",                                        
+      182 +                    r.status(), i + 1, BACKOFF.size() + 1, BAC
+          +KOFF.get(i).toSeconds());                                     
+      183 +            sleeper.sleep(BACKOFF.get(i));                    
+      184 +        }                                                     
+      185 +    }                                                         
+      186 +                                                              
+      187 +    /** Only overload (503) and rate limit (429) are temporary
+          +; every other status is final. */                             
+      188 +    static boolean isRetryable(int status) {                  
+      189 +        return status == 503 || status == 429;                
+      190 +    }                                                         
+      191 +                                                              
+      192 +    /**                                                       
+      193 +     * True only for an HTTP 400 whose error message is about 
+          +the response schema.                                          
+      194 +     * False for API_KEY_INVALID and any other 400 (e.g. a bad
+          + image), so those are not retried.                            
+      195 +     */                                                       
+      196 +    static boolean isSchemaRejection(int status, String body, 
+          +ObjectMapper mapper) {                                        
+      197 +        if (status != 400 || body == null) return false;      
+      198 +        JsonNode err;                                         
+      199 +        try {                                                 
+      200 +            err = mapper.readTree(body).path("error");        
+      201 +        } catch (IOException e) {                             
+      202 +            return false;                                     
+      203 +        }                                                     
+      204 +        for (JsonNode d : err.path("details")) {              
+      205 +            if ("API_KEY_INVALID".equals(d.path("reason").asTe
+          +xt())) return false;                                          
+      206 +        }                                                     
+      207 +        String m = err.path("message").asText("").toLowerCase(
+          +Locale.ROOT);                                                 
+      208 +        if (m.contains("api key")) return false;              
+      209 +        return m.contains("response_schema") || m.contains("re
+          +sponseschema") || m.contains("response schema");              
+      210 +    }                                                         
+      211 +                                                              
+      212 +    /** Gemini's error status and message for the log, with an
+          +y API key removed and length capped. */                       
+      213 +    static String errorMessage(String body, String apiKey, Obj
+          +ectMapper mapper) {                                           
+      214 +        if (body == null || body.isBlank()) return null;      
+      215 +        String msg;                                           
+      216 +        try {                                                 
+      217 +            JsonNode err = mapper.readTree(body).path("error")
+          +;                                                             
+      218 +            JsonNode m = err.path("message");                 
+      219 +            if (m.isTextual()) {                              
+      220 +                String st = err.path("status").asText("");    
+      221 +                msg = st.isEmpty() ? m.asText() : st + ": " + 
+          +m.asText();                                                   
+      222 +            } else {                                          
+      223 +                msg = body;                                   
+      224 +            }                                                 
+      225 +        } catch (IOException e) {                             
+      226 +            msg = body;                                       
+      227 +        }                                                     
+      228 +        return redact(msg, apiKey);                           
+      229 +    }                                                         
+      230 +                                                              
+      231 +    /** Removes the literal key and anything shaped like a Goo
+          +gle key (AIza… or AQ.…), then caps the length. */             
+      232 +    static String redact(String s, String apiKey) {           
+      233 +        if (s == null) return null;                           
+      234 +        if (apiKey != null && !apiKey.isBlank()) s = s.replace
+          +(apiKey, REDACTED);                                           
+      235 +        s = AIZA_KEY.matcher(s).replaceAll(REDACTED);         
+      236 +        s = AQ_KEY.matcher(s).replaceAll(REDACTED);           
+      237 +        return s.length() > MAX_ERROR_CHARS ? s.substring(0, M
+          +AX_ERROR_CHARS) + "…" : s;                                    
+      238 +    }                                                         
+      239 +                                                              
+      240 +    private static long msSince(long t0) {                    
+      241 +        return (System.nanoTime() - t0) / 1_000_000;          
+      242 +    }                                                         
+      243 +                                                              
+      244 +    private Reply httpSend(byte[] image, String mime, boolean 
+          +withSchema) throws IOException, InterruptedException {        
+      245          ObjectNode body = mapper.createObjectNode();
+      246          ObjectNode textPart = mapper.createObjectNode().put("t
+           ext", PROMPT);
+      247          ObjectNode inline = mapper.createObjectNode()
+
+● Update(backend/src/main/java/kz/medbox/vision/GeminiVisionClient.java)
+  ⎿  Added 2 lines, removed 1 line
+      260                  .header("x-goog-api-key", apiKey) // header, n
+           ot URL: the key never appears in URLs or access logs
+      261                  .POST(HttpRequest.BodyPublishers.ofString(mapp
+           er.writeValueAsString(body)))
+      262                  .build();
+      263 -        return http.send(req, HttpResponse.BodyHandlers.ofStri
+          -ng());                                                        
+      263 +        HttpResponse<String> resp = http.send(req, HttpRespons
+          +e.BodyHandlers.ofString());                                   
+      264 +        return new Reply(resp.statusCode(), resp.body());     
+      265      }
+      266  
+      267      /** Package-private for unit tests. */
+
+● Update(backend/src/main/java/kz/medbox/vision/GeminiVisionClient.java)
+  ⎿  Added 5 lines
+       6  import kz.medbox.core.Model.ExtractedFields;
+       7  import org.slf4j.Logger;
+       8  import org.slf4j.LoggerFactory;
+       9 +import org.springframework.beans.factory.annotation.Autowired; 
+      10  import org.springframework.beans.factory.annotation.Value;
+      11  import org.springframework.stereotype.Component;
+      12  
+     ...
+      15  import java.net.http.HttpClient;
+      16  import java.net.http.HttpRequest;
+      17  import java.net.http.HttpResponse;
+      18 +import java.net.http.HttpTimeoutException;                     
+      19  import java.time.Duration;
+      20  import java.util.Base64;
+      21 +import java.util.List;                                         
+      22 +import java.util.Locale;                                       
+      23 +import java.util.regex.Pattern;                                
+      24  
+      25  /**
+      26   * Reads the four printed fields (name, strength, form, manufac
+          turer) from a package photo with Gemini.
+
+● Update(backend/src/main/java/kz/medbox/vision/GeminiVisionClient.java)
+  ⎿  Added 3 lines
+      34   *   The model has no tools and its output is only 4 strings th
+          at code validates, so injected text cannot act.
+      35   * - Every call is logged with the model's raw reply, latency a
+          nd token usage (Lecture 6 slide 17:
+      36   *   "keep the image and the reply"; Lecture 8 slide 23: "if yo
+          u did not log it, it did not happen").
+      37 + *   Failures are logged too (HTTP error with Gemini's redacted
+         + message, timeout, network error).                             
+      38 + * - Reliability: HTTP 503/429 are retried (waits 2 s, 5 s; 3 a
+         +ttempts at most). A schema-specific HTTP 400                   
+      39 + *   is retried once without responseSchema. Everything else fa
+         +ils at once as VisionUnavailableException (503).               
+      40   *
+      41   * API docs: https://ai.google.dev/gemini-api/docs/image-unders
+          tanding , .../structured-output
+      42   */
+
+● Now the log:
+
+● Update(backend/src/main/java/kz/medbox/vision/VisionLog.java)
+  ⎿  Added 22 lines, removed 2 lines
+      38          this.mapper = mapper;
+      39      }
+      40  
+      41 -    public synchronized void write(byte[] image, String model, 
+         -long ms, int status, boolean schemaUsed,                       
+      42 -                                   ExtractedFields fields, Json
+         -Node usage) {                                                  
+      41 +    /** A successful call: extracted fields and token usage. */
+      42 +    public void write(byte[] image, String model, long ms, int 
+         +status, boolean schemaUsed, int attempts,                      
+      43 +                      ExtractedFields fields, JsonNode usage) {
+      44 +        append(image, model, ms, status, schemaUsed, attempts, 
+         +fields, usage, null, null);                                    
+      45 +    }                                                          
+      46 +                                                               
+      47 +    /**                                                        
+      48 +     * A failed call. status is the HTTP status, or 0 when no r
+         +esponse arrived.                                               
+      49 +     * errorKind: http | timeout | network | interrupted.      
+      50 +     * error must already be redacted by the caller (GeminiVisi
+         +onClient.redact); it is Gemini's message, never the key.       
+      51 +     */                                                        
+      52 +    public void writeError(byte[] image, String model, long ms,
+         + int status, boolean schemaUsed, int attempts,                 
+      53 +                           String errorKind, String error) {   
+      54 +        append(image, model, ms, status, schemaUsed, attempts, 
+         +null, null, errorKind, error);                                 
+      55 +    }                                                          
+      56 +                                                               
+      57 +    private synchronized void append(byte[] image, String model
+         +, long ms, int status, boolean schemaUsed,                     
+      58 +                                     int attempts, ExtractedFie
+         +lds fields, JsonNode usage,                                    
+      59 +                                     String errorKind, String e
+         +rror) {                                                        
+      60          try {
+      61              ObjectNode n = mapper.createObjectNode();
+      62              n.put("time", Instant.now().toString());
+     ...
+      64              n.put("ms", ms);
+      65              n.put("status", status);
+      66              n.put("schemaUsed", schemaUsed);
+      67 +            n.put("attempts", attempts);                       
+      68              n.put("imageSha256", sha256(image));
+      69              if (fields != null) n.set("fields", mapper.valueToT
+          ree(fields));
+      70              if (usage != null && !usage.isMissingNode()) n.set(
+          "usage", usage);
+      71 +            if (errorKind != null) n.put("errorKind", errorKind
+         +);                                                             
+      72 +            if (error != null) n.put("error", error);          
+      73              Files.createDirectories(file.getParent());
+      74              Files.writeString(file, mapper.writeValueAsString(n
+          ) + "\n", StandardCharsets.UTF_8,
+      75                      StandardOpenOption.CREATE, StandardOpenOpti
+          on.APPEND);
+
+● Update(backend/src/main/java/kz/medbox/vision/VisionLog.java)
+  ⎿  Added 3 lines, removed 2 lines
+      21  
+      22  /**
+      23   * Appends one JSON line per vision call to logs/vision.jsonl:
+      24 - * time, model, latency, HTTP status, whether the schema was us
+         -ed, extracted fields, token usage,                             
+      25 - * and the SHA-256 of the image (so a logged reply can be match
+         -ed to an eval photo without storing the photo).                
+      24 + * time, model, latency, HTTP status (0 = no response), whether
+         + the schema was used, number of attempts,                      
+      25 + * extracted fields, token usage, and the SHA-256 of the image 
+         +(so a logged reply can be matched to an eval photo             
+      26 + * without storing the photo). Failed calls add errorKind and G
+         +emini's error message.                                         
+      27   * Never logs the API key. logs/ is in .gitignore.
+      28   */
+      29  @Component
+
+● Now the tests:
+
+● Write(backend/src/test/java/kz/medbox/vision/GeminiRetryTest.java)
+  ⎿  Wrote 342 lines to
+     backend/src/test/java/kz/medbox/vision/GeminiRetryTest.java
+       1 package kz.medbox.vision;
+       2 
+       3 import com.fasterxml.jackson.databind.JsonNode;
+       4 import com.fasterxml.jackson.databind.ObjectMapper;
+       5 import kz.medbox.api.ErrorHandler;
+       6 import kz.medbox.core.Model.ExtractedFields;
+       7 import kz.medbox.vision.GeminiVisionClient.Reply;
+       8 import kz.medbox.vision.GeminiVisionClient.VisionUnavailableExce
+         ption;
+       9 import org.junit.jupiter.api.Test;
+     … +333 lines (ctrl+o to expand)
+
+● Bash(cd /home/lubixua/Desktop/medicine-box-assistant/backend && mvn -q test
+      2>&1 | tail -40; echo "exit=$?"; grep -h "Tests run"
+      target/surefire-reports/*.txt)
+  ⎿  22:29:47.005 [main] WARN kz.medbox.vision.GeminiVisionClient -- Gemini
+      rejected the response schema (HTTP 400); retrying without schema
+     22:29:47.006 [main] WARN kz.medbox.vision.GeminiVisionClient -- Gemini
+     … +22 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+● Bash(mvn test 2>&1 | grep -E "Tests run:|BUILD|ERROR" | tail -8; cd .. && git
+      add -N backend/src/test/java/kz/medbox/vision/GeminiRetryTest.java &&
+      python tools/chec…)
+  ⎿  [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed:
+      0.126 s -- in kz.medbox.core.RetrieverTest
+     [INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed:
+     … +16 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+
+● python here is Python 2. Running the secret check again with python3:
+
+● Bash(git add -N backend/src/test/java/kz/medbox/vision/GeminiRetryTest.java &&
+      python3 tools/check_secrets.py; echo "check_secrets exit=$?"; git reset
+      -q backend/src…)
+  ⎿  check_secrets: no secrets found
+     check_secrets exit=0
+
+● The Gemini vision client now retries, falls back only on schema errors, logs
+  every failure with a redacted message, and returns timeouts as 503. All 45
+  backend tests pass (mvn test: BUILD SUCCESS), including 21 new ones in
+  GeminiRetryTest. The secret check also passes on the new test file. Nothing is
+  committed.
+
+  What changed
+  - GeminiVisionClient.java
+    - Retries: HTTP 503 and 429 are retried with waits of 2 s and then 5 s, for
+      at most 3 attempts in total. Every other status fails at once.
+    - Schema fallback: it only happens when the 400 error message is about the
+      response schema. API_KEY_INVALID and other 400s (e.g. a bad image) fail
+      after one call. The fallback request also gets the 503/429 retries.
+    - Timeouts and network errors are logged and turned into
+      VisionUnavailableException, which ErrorHandler already maps to 503.
+      Interruptions are handled the same way. Timeouts are not retried.
+    - Redaction: before logging, the configured key, any AIza… key and any AQ.…
+      key (AQ\.[0-9A-Za-z_\-.]{20,}) are replaced with [redacted]. I used the
+      same patterns as tools/check_secrets.py. Messages are capped at 500
+      characters.
+    - The app only sees short messages like "Gemini returned HTTP 503 after 3
+      attempts". Gemini's own error text goes only to the log.
+  - VisionLog.java: every line now has attempts. Failed calls add errorKind
+    (http, timeout, network or interrupted) and error, and use status: 0 when no
+    response arrived.
+  - ErrorHandler.java: no change was needed. I didn't add a catch-all that turns
+    every IOException into 503, because that would also hide unrelated errors
+    such as a broken upload. The API contract is unchanged.
+
+  AQ.-format tests (your correction): there are three:
+  - a redaction test with all three key formats in one string;
+  - a test where the configured key is an AQ. key and Gemini echoes it back in
+    its error; neither the log nor the message to the app contains the key or
+    any fragment of it;
+  - a test where an AQ. key that isn't the configured key is still redacted.
+
+  The fake keys are built at runtime, so the pre-commit secret check doesn't
+  flag the test file.
+
+  Notes
+  - On this machine python is Python 2, and python tools/check_secrets.py fails
+    with a SyntaxError. It only ran with python3. If the pre-commit hook calls
+    plain python, it may be failing too.
+  - I didn't add an overall time limit across attempts, since you didn't answer
+    that question. Three slow 503s could still each take up to the 150 s
+    timeout.
+
+✻ Churned for 2m 32s · done 22:30

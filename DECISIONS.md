@@ -103,3 +103,19 @@ in git history costs points.
   and set the default to `gemini-3.6-flash`, the model named in our proposal. Not using `*-latest` aliases:
   the model behind them can change and break reproducibility of the evaluation.
   Lesson: check model ids against the provider's model list, not against memory.
+
+## First real photo (16 Nov, ~21:30)
+- **Real product added:** Анальгин 500 мг таблетки, Борисовский ЗМП, KZ registration РК-ЛС-5№011176,
+  leaflet text from MedElement (Kazakhstan drug directory). `/identify/fields` → `analgin-500-tab-bzmp`,
+  `/retrieve "Как хранить?"` → section "Условия хранения" with the verbatim leaflet text.
+- **Gemini HTTP 400 was API_KEY_INVALID** (a wrong value in the shell variable). The log stored only the status
+  code, so we found the reason with a direct curl. Key now loaded from a git-ignored `.env`; `check_secrets.py`
+  extended to the `AQ.` key format and tested (blocked a test commit).
+- **Latency:** gemini-3.6-flash needed 92 s for one package photo (direct call, HTTP 200). Our 30 s timeout
+  cut every request. Timeout now configurable, default 150 s. 92 s is too slow for a phone app: to measure
+  later on the photo set: gemini-3.5-flash / flash-lite, lower thinking, smaller image.
+- **Brand vs legal manufacturer name:** the package says "Borimed", the leaflet says "Борисовский завод
+  медицинских препаратов". Our matcher treats them as different → MANUFACTURER_MISMATCH → asks the user.
+  Safe, but an extra step. Planned: `manufacturerAliases` in catalogue.json.
+- **Observation:** asked for one line, the model answered in English ("Tablets", "Borimed"). Our production
+  prompt asks to copy text as printed; field-level accuracy on photos will show whether it does.

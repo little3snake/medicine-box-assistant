@@ -1,0 +1,20 @@
+# secrets
+.env
+*.env
+!.env.example
+# build
+backend/target/
+android/build/
+android/app/build/
+android/.gradle/
+*.class
+# IDE
+.idea/
+.vscode/
+*.iml
+# runtime logs
+logs/
+backend/logs/
+# eval outputs
+eval/results_*.csv
+__pycache__/

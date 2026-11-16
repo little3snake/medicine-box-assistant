@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -93,8 +94,10 @@ private fun MedicineApp(model: MedicineViewModel) {
         topBar = {
             Surface(color = MaterialTheme.colorScheme.surface) {
                 Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.LocalPharmacy, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                    Text("Medicine Box", Modifier.weight(1f).padding(start = 10.dp), fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
+                    Surface(Modifier.size(36.dp), color = MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(11.dp)) {
+                        Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Medication, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onPrimary) }
+                    }
+                    Text("Medicine Box", Modifier.weight(1f).padding(start = 10.dp), fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
                     FilledTonalButton(onClick = model::toggleText, enabled = !model.busy,
                         shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(8.dp),
                         modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
@@ -306,9 +309,22 @@ private fun MedicineApp(model: MedicineViewModel) {
 }
 @Composable private fun PackageIllustration() {
     Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(20.dp)) {
-        Row(Modifier.padding(24.dp).heightIn(min = 80.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Icon(Icons.Outlined.Medication, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-            Text("Название и дозировка\nдолжны быть видны", color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 16.sp)
+        Row(Modifier.padding(22.dp).heightIn(min = 84.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Surface(Modifier.width(108.dp).heightIn(min = 78.dp), color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                Row {
+                    Box(Modifier.width(8.dp).height(78.dp).background(MaterialTheme.colorScheme.primary))
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("УПАКОВКА", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Box(Modifier.width(48.dp).height(4.dp).background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)))
+                        Box(Modifier.width(38.dp).height(4.dp).background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(2.dp)))
+                    }
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.QrCodeScanner, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+                Text("Название и дозировка", color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 13.sp)
+            }
         }
     }
 }

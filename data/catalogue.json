@@ -1,0 +1,57 @@
+[
+  {
+    "id": "sample-paracetamol-500-tab",
+    "tradeName": "Парацетамол-Образец",
+    "inn": "парацетамол",
+    "strength": "500 мг",
+    "form": "таблетки",
+    "manufacturer": "Образец Фарм",
+    "registrationNumber": "SAMPLE-0001",
+    "lookAlikeGroup": "paracetamol-tab",
+    "sample": true
+  },
+  {
+    "id": "sample-paracetamol-200-tab",
+    "tradeName": "Парацетамол-Образец",
+    "inn": "парацетамол",
+    "strength": "200 мг",
+    "form": "таблетки",
+    "manufacturer": "Образец Фарм",
+    "registrationNumber": "SAMPLE-0002",
+    "lookAlikeGroup": "paracetamol-tab",
+    "sample": true
+  },
+  {
+    "id": "sample-ibuprofen-200-tab",
+    "tradeName": "Ибупрофен-Образец",
+    "inn": "ибупрофен",
+    "strength": "200 мг",
+    "form": "таблетки, покрытые пленочной оболочкой",
+    "manufacturer": "Образец Фарм",
+    "registrationNumber": "SAMPLE-0003",
+    "lookAlikeGroup": "ibuprofen",
+    "sample": true
+  },
+  {
+    "id": "sample-ibuprofen-100-5-susp",
+    "tradeName": "Ибупрофен-Образец",
+    "inn": "ибупрофен",
+    "strength": "100 мг/5 мл",
+    "form": "суспензия для приема внутрь",
+    "manufacturer": "Образец Фарм",
+    "registrationNumber": "SAMPLE-0004",
+    "lookAlikeGroup": "ibuprofen",
+    "sample": true
+  },
+  {
+    "id": "sample-ibuprofen-200-tab-other",
+    "tradeName": "Ибупрофен-Образец",
+    "inn": "ибупрофен",
+    "strength": "200 мг",
+    "form": "таблетки, покрытые пленочной оболочкой",
+    "manufacturer": "Другой Завод",
+    "registrationNumber": "SAMPLE-0005",
+    "lookAlikeGroup": "ibuprofen",
+    "sample": true
+  }
+]

@@ -15,6 +15,7 @@ import sys
 
 PATTERNS = [
     ("Google API key", re.compile(r"AIza[0-9A-Za-z_\-]{35}")),
+    ("Google API key (AQ. format)", re.compile(r"AQ\.[0-9A-Za-z_\-.]{20,}")),
     ("OpenAI-style key", re.compile(r"sk-[A-Za-z0-9_\-]{20,}")),
     ("Anthropic key", re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}")),
     ("GitHub token", re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}")),

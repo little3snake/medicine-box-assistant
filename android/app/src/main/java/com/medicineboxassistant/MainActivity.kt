@@ -74,6 +74,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun MedicineApp(model: MedicineViewModel) {
     val context = LocalContext.current
+    var permissionRevision by remember { mutableIntStateOf(0) }
+    val localNetworkPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        permissionRevision++
+    }
+    LaunchedEffect(model.demo, model.server) {
+        if (!model.demo && LocalServerAccess.missing(context, model.server)) {
+            localNetworkPermission.launch(LocalServerAccess.PERMISSION)
+        }
+    }
     var deleteItem by remember { mutableStateOf<SavedMedicine?>(null) }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) model.identifyPhoto(uri)
@@ -250,7 +259,9 @@ private fun MedicineApp(model: MedicineViewModel) {
                             TextButton(onClick = { model.navigate(Page.SETTINGS) }) { Text("Настройки подключения") }
                         } }
                     }
-                    Page.SETTINGS -> item { ConnectionSettings(model) }
+                    Page.SETTINGS -> item { ConnectionSettings(model, permissionRevision) {
+                        localNetworkPermission.launch(LocalServerAccess.PERMISSION)
+                    } }
                 }
                 if (model.page != Page.CHAT) item { Disclaimer() }
             }
@@ -457,7 +468,8 @@ private fun MedicineApp(model: MedicineViewModel) {
     }
     if (failed) Text("Не удалось открыть браузер.", color = MaterialTheme.colorScheme.error)
 }
-@Composable private fun ConnectionSettings(model: MedicineViewModel) {
+@Composable private fun ConnectionSettings(model: MedicineViewModel, permissionRevision: Int, requestLocalAccess: () -> Unit) {
+    val context = LocalContext.current
     var url by remember(model.server) { mutableStateOf(model.server) }
     var demo by remember(model.demo) { mutableStateOf(model.demo) }
     var invalid by remember { mutableStateOf(false) }
@@ -467,6 +479,11 @@ private fun MedicineApp(model: MedicineViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(demo, { demo = it }); Text("Учебный деморежим") }
         Field("Адрес сервера", url) { url = it; invalid = false }
         Label("Эмулятор: http://10.0.2.2:8080. На телефоне нужен адрес компьютера в общей сети.")
+        val missingLocalAccess = remember(url, permissionRevision) { LocalServerAccess.missing(context, url) }
+        if (missingLocalAccess) {
+            Text("Android требует разрешение для подключения к серверу на вашем компьютере.")
+            SecondaryAction("Разрешить доступ к локальной сети", requestLocalAccess)
+        }
         if (invalid) Text("Проверьте адрес: http:// или https:// и имя сервера.", color = MaterialTheme.colorScheme.error)
         PrimaryAction("Сохранить подключение", { runCatching { model.configure(url, demo) }.onFailure { invalid = true } })
         SecondaryAction("Проверить сохранённый сервер", model::checkConnection)

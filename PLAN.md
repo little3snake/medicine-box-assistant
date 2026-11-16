@@ -165,6 +165,10 @@ All rates reported with a **95% Wilson interval**, separately for RU and KK; ret
 
 ### Approved UI redesign and integration
 
+Manual-search timeout fix: Android 17 requires runtime local-network access for the development
+server. Declare and request this permission only for local server addresses, fail clearly on denial,
+and verify the real Android HTTP client against the running backend with an opt-in device test.
+
 Visual fidelity follow-up approved by user: use the accepted medicine-clear-blue preview as the
 reference, with explicit white surfaces, blue accents, neutral borders, full-width selected-product
 card, labelled non-floating composer and consistent navigation. Preserve API and state behavior.

@@ -157,6 +157,14 @@ Codex: _(add if used)_.
 
 ### Blue UI integration update
 
+- Real device manual search revealed a missed Android 17 requirement: target SDK 37
+  needs ACCESS_LOCAL_NETWORK for the emulator host/LAN backend. Shell TCP probes and
+  host HTTP tests succeeded while application requests timed out; those checks were
+  insufficient to prove Android transport. Added manifest permission, runtime request
+  for local server addresses, a settings retry control and explicit permission-denied
+  preflight. Added an opt-in real-device HTTP test, which passed with permission in 965 ms.
+  Reference: https://developer.android.com/privacy-and-security/local-network-permission
+
 - User's screenshot review identified that default Material components did not match
   the approved preview: tinted narrow product summary, outlined composer label and
   differing control styling. Corrected with explicit white surfaces, neutral borders,

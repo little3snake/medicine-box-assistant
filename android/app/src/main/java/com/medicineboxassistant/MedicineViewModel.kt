@@ -60,8 +60,13 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     fun beginNew() { invalidateConfirmation(); identification = null; fields = PackageFields(); photo = null; page = Page.HOME }
     fun reportPhotoFailure() { retry = null; canRetry = false; fail("Не удалось открыть фото", "Выберите другое фото или введите название вручную.", Page.HOME) }
 
-    private fun perform(label: String, retryAction: () -> Unit, action: suspend () -> Unit) {
+    private fun perform(label: String, retryAction: () -> Unit, requiresNetwork: Boolean = !demo, action: suspend () -> Unit) {
         if (busy) return
+        if (requiresNetwork && LocalServerAccess.missing(getApplication(), server)) {
+            retry = retryAction; canRetry = true
+            fail("Нужен доступ к локальному серверу", "В настройках подключения разрешите доступ к локальной сети, затем повторите запрос.", page)
+            return
+        }
         returnPage = page
         retry = retryAction
         canRetry = true
@@ -179,7 +184,7 @@ class MedicineViewModel(application: Application) : AndroidViewModel(application
     }
     fun checkConnection() {
         connectionStatus = ""
-        perform("Проверяем сервер…", { checkConnection() }) {
+        perform("Проверяем сервер…", { checkConnection() }, requiresNetwork = true) {
             connectionStatus = if (MedboxApi(server).health()) "Сервер отвечает. Доступность модели проверяется при запросе." else "Сервер вернул неизвестный статус."
         }
     }

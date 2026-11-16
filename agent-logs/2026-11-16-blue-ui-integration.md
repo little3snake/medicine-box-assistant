@@ -48,3 +48,17 @@ inputs, external field labels, blue Aa control, blue navigation tiles, consisten
 typography and asymmetrical question bubble. The chat composer and disclaimer now follow
 the preview's grouping; navigation stays available. Updated the field selector in the
 flow test for the external accessible label. No API or medicine policy changes.
+
+## Real device transport correction
+
+After the personal API key was supplied, a server-side Gemini answer completed in
+93981 ms and its quotation matched the leaflet. User still observed manual-search
+timeouts. Investigated Android proxy settings and host/emulator health (all normal).
+Android 17 local-network permission was missing. Added scoped runtime permission flow
+and a preflight with an actionable message. Never exposed the key.
+
+Created BackendConnectionTest (opt-in, live backend). Its first definition returned
+an integer from Log.i through runBlocking, which JUnit rejected; explicitly returning
+Unit fixed it. With permission granted, the actual Android HTTP health/manual match
+passed in 965 ms. Local-address unit tests and the build passed. Installed the fix.
+Source: https://developer.android.com/privacy-and-security/local-network-permission

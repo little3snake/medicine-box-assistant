@@ -32,6 +32,20 @@ In the app's settings gear, turn off demo and save `http://10.0.2.2:8080` for th
 Android Studio emulator. A physical phone needs the computer's reachable LAN IP.
 HTTP is enabled only in debug; release endpoints must use HTTPS.
 
+Android 17 (API 37) also requires runtime local-network permission for these development
+addresses. Allow the system prompt when enabling API mode. If denied, open connection
+settings and choose "Разрешить доступ к локальной сети". The app checks for denial before
+sending local requests. Public API hostnames do not trigger this development permission.
+
+Optional live Android transport test, with the backend running:
+
+```powershell
+.\gradlew.bat :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.medicineboxassistant.BackendConnectionTest -Pandroid.testInstrumentationRunnerArguments.medboxServer=http://10.0.2.2:8080
+```
+
+This test grants local-network permission through test automation and checks health plus
+real manual identification. With no medboxServer argument it is skipped.
+
 Current catalogue: six variants, five marked samples, and one real sourced leaflet:
 `analgin-500-tab-bzmp`. It is not a complete medicine database. Sample records cannot
 produce medical answers. The 16 November integration smoke check returned healthy

@@ -51,10 +51,12 @@ class MainActivity : ComponentActivity() {
                 MaterialTheme(colorScheme = lightColorScheme(
                     primary = Color(0xFF2455A6), onPrimary = Color.White,
                     primaryContainer = Color(0xFFEAF0FC), onPrimaryContainer = Color(0xFF173B78),
+                    secondary = Color(0xFF2455A6), onSecondary = Color.White,
+                    secondaryContainer = Color(0xFFEAF0FC), onSecondaryContainer = Color(0xFF173B78),
                     background = Color(0xFFF5F7FB), onBackground = Color(0xFF18263D),
                     surface = Color.White, onSurface = Color(0xFF18263D),
                     surfaceVariant = Color(0xFFEDF1F8), onSurfaceVariant = Color(0xFF526079),
-                    outline = Color(0xFF748197)
+                    outline = Color(0xFF748197), outlineVariant = Color(0xFFD8DFEB)
                 )) { MedicineApp(model) }
             }
         }

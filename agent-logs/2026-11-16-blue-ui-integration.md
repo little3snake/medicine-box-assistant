@@ -34,3 +34,8 @@ User was informed. Successful provider integration is not claimed.
 Android implementation commit: 2ba8ee7. Follow-up changes handle unreadable input,
 retry availability, model timeouts and transport failures. Remaining work: user
 acceptance testing, valid-key model smoke, broader catalogue/evaluation.
+
+Final visual check exposed an emulator compositor issue: semantic nodes were present
+but the app surface appeared black and hidden. Rebooting the emulator without wiping
+data restored rendering. Inspected the actual blue home screen after a cold launch;
+aligned the navigation selection and outline colours with the same blue palette.

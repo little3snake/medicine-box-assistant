@@ -1,40 +1,20 @@
-# Medicine Box Assistant
+# Android screens and real API
 
-Android application for identifying a medicine package, confirming its exact variant,
-and reading leaflet answers with verified quotations. This is a student prototype.
-
-## Current status
-
-The Android client builds and has separate **Demo** and **API** modes. Demo uses
-clearly labelled synthetic responses and does not call a model. API mode implements
-the contract in `PLAN.md`. A complete real-data flow is not yet verified.
-
-The answer module provides `/api/products/{id}/ask` and `/card`. It needs Spring
-`Catalogue` and `Retriever` beans from the backend integration. Without them it
-returns HTTP 503. Sample catalogue entries are rejected for leaflet answers.
-
-## Android
-
-Install Android Studio and its Android SDK. Open `android/` and let Gradle sync.
-The project uses SDK 37, minimum Android 8 (API 26), and a Java 25 Gradle daemon.
-On a clean machine Gradle needs internet access to download its dependencies and JDK.
+Open `android/` in Android Studio, sync, choose `app` and an emulator, then Run.
+The project targets SDK 37, minimum API 26; Gradle uses a Java 25 daemon.
 
 ```powershell
 cd android
 .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest
+.\gradlew.bat :app:connectedDebugAndroidTest
 ```
 
-Run the `app` configuration on an emulator or Android device. In the app settings,
-choose API mode and use `http://10.0.2.2:8080` for a backend on the emulator host.
-A physical phone needs the computer's reachable LAN address. HTTP is enabled only
-in debug builds; production endpoints must use HTTPS. No API key belongs in Android.
+The connected tests need an emulator and clear this app's test preferences. Use a
+dedicated emulator to preserve manual test data.
 
-Select/take a photo or enter printed fields, search for variants, select the exact
-package, then explicitly confirm it before asking a question.
+## Real mode
 
-## Backend
-
-Install JDK 21 or later and Maven. The build targets Java 21.
+Start the backend with JDK 21+ and Maven:
 
 ```powershell
 cd backend
@@ -42,39 +22,48 @@ mvn test
 mvn spring-boot:run
 ```
 
-Set `GEMINI_API_KEY` in the backend environment. As requested for local development,
-the answer client also reads a git-ignored `.env` in the repository root or backend
-working directory. Its syntax is Java properties: `GEMINI_API_KEY=your_value`, with
-no `export` or surrounding quotes. Environment variables take precedence.
-`GEMINI_MODEL` is configurable; the default is `gemini-3.6-flash`. Availability,
-quota and an actual provider call still need verification for your account.
+JAVA_HOME points to the JDK directory, not its `bin`. Set GEMINI_API_KEY in the
+environment or ignored root/backend `.env`: `GEMINI_API_KEY=your_value`, without
+quotes or `export`. Restart the server after editing it. Never put keys in Android.
+The answer component's local property source is shared by the Spring context,
+including the vision client. Environment variables take precedence.
 
-Runtime model metadata goes to ignored `logs/answer-calls.jsonl`. Do not commit
-keys, personal photos or runtime logs.
+In the app's settings gear, turn off demo and save `http://10.0.2.2:8080` for the
+Android Studio emulator. A physical phone needs the computer's reachable LAN IP.
+HTTP is enabled only in debug; release endpoints must use HTTPS.
 
-## Integration handoff
+Current catalogue: six variants, five marked samples, and one real sourced leaflet:
+`analgin-500-tab-bzmp`. It is not a complete medicine database. Sample records cannot
+produce medical answers. The 16 November integration smoke check returned healthy
+API and the expected real variant for manual fields, but `visionConfigured: false`:
+the local GEMINI_API_KEY was empty. No successful live model call is claimed.
 
-Angelina's backend supplies the identify/fields, identify/photo, product, leaflet and
-retrieval endpoints from `PLAN.md`, and registers `Catalogue` and `Retriever` beans.
-Every leaflet section needs a unique, nonempty `passageId`; source URLs must use
-HTTPS, and production records must contain real sourced text with `sample: false`.
-Tatiana's isolated implementation is in `kz.medbox.answers` and `android/`.
+## Screen flow
 
-The answer model selects evidence; application code validates exact quotations and
-constructs the answer from those quotations. This intentionally limits generated
-prose for the checkpoint. Personal-treatment detection is a heuristic and still
-requires evaluation. Exact quote validation alone does not prove relevance.
+Home → camera/gallery or manual input → candidates when needed → explicit packaging
+confirmation → question shortcuts or chat → expandable quotations / full leaflet.
 
-Before submitting the checkpoint: test a real photo through the actual backend and
-model, confirm a variant, ask a question, inspect its source, and record the tested
-commit. A demo-only run is not evidence that this integration works.
+The cabinet persists product metadata and IDs in app-private preferences, scoped by
+server and demo mode. It does not persist photos, questions or generated answers.
+Opening a saved product reloads its data and requires confirmation again. Instructions
+are loaded online; this is not an offline leaflet store.
 
-## Checks
+Aa enlarges text in addition to system font scaling. Main actions are labelled and
+at least 56 dp high. Long content scrolls; leaflet sections expand on demand. Changing
+printed fields clears the old confirmation and answers. Provider/network failures
+preserve input and offer retry. Photo input accepts JPEG/PNG/WebP, at most 10 MB.
+Backend model timeout defaults to 150 seconds; Android waits 180 seconds and offers cancel.
 
-```powershell
-python tools/check_secrets.py --all
-```
+## Verification
 
-Backend tests currently cover matching, retrieval, quote validation, mixed variants,
-sample rejection and personal-treatment referral. Provider connectivity and the
-complete Android-to-backend flow are separate pending integration checks.
+- Android debug build and unit test task passed.
+- Device tests cover confirmation before chat, demo answer labelling, saved cabinet
+  across activity recreation and re-confirmation of saved products.
+- 37 backend tests passed, including four real Spring integration tests for API/core
+  wiring, passage IDs, readable card, sample rejection and referral without a model.
+- Actual photo → Gemini → confirmed product → answer quotation remains to be checked
+  with a valid key/quota. Exact quotations alone do not establish medical correctness.
+
+After adding the key, check `/api/health` for `visionConfigured: true`, then run that
+complete flow on a matching package. Record model ID, latency and outcome separately
+from deterministic tests. User testing and accessibility review still remain.

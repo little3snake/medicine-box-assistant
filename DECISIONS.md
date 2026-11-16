@@ -155,6 +155,20 @@ Codex: _(add if used)_.
 
 # Decisions and outstanding choices
 
+### Blue UI integration update
+
+- User approved the preview and authorized real screen/API implementation. Preserve
+  the teammate's Java core and merge her backend instead of duplicating endpoints.
+- Use one blue palette, labelled actions, 56 dp main touch targets and system font
+  scaling plus an optional enlargement control. No new medical capabilities implied.
+- Save product metadata locally, never generated medical answers. Re-fetch and
+  reconfirm saved variants; isolate demo/API records and server environments.
+- Real API health/manual match work, but the local key is empty. Live model success
+  remains unverified. The catalogue contains only one real sourced variant.
+- Updated Espresso to 3.7.0 after its old InputManager reflection failed on API 37.
+- Align answer/provider timeouts with vision and return a retryable 503 on transport
+  failure. Exact quotations remain the server's independent validation boundary.
+
 ## 16 November 2026 — implementation update
 
 - Android Studio and SDK are now installed; the Android debug build passes.

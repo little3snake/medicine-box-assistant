@@ -163,6 +163,15 @@ All rates reported with a **95% Wilson interval**, separately for RU and KK; ret
 
 ## 15. Tatiana's implementation session — 16 November
 
+### Approved UI redesign and integration
+
+User approved the blue accessible screens and requested their implementation and real API wiring.
+Implement home/photo, manual fields, candidates, confirmation, chat, leaflet, saved cabinet and
+recoverable error screens. Use one blue design system, labelled controls and large text support.
+Persist saved product identifiers locally; reload official content from the API rather than inventing
+or caching medical answers. Keep demo data and API data separate. Integrate origin/main backend,
+test UI transitions and actual HTTP endpoints, then record limitations and focused commits.
+
 Approved by Tatiana: keep the GitHub division of responsibilities and implement her part with an agent.
 Use branch `feature/android`, starting from backend commit `f91eca3`. Earlier local planning files are
 preserved outside the repository in `tmp/medicine-local-planning-backup` under the AI workspace.
